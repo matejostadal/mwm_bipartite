@@ -8,6 +8,7 @@
 
 import numpy as np
 import copy
+import itertools
 
 MAX_WEIGHT = 100
 INSTANCE_SEED = 420
@@ -18,14 +19,72 @@ def mwm_clever(graph):
     return "easy"
 
 
-def mwm_brute_force(graph):
+def mwm_brute_force(graph, class_size):
     
-    return "uffff"
+    all_matchings = construct_all_matchings(graph, class_size)
+    
+    # get the important (class-connecting) edges
+    edges = graph[:class_size, class_size:]
+    
+    # find the best matching of all
+    max_matching = max_sum_matching(edges, all_matchings)
 
+    return max_matching
+
+
+def construct_all_matchings(graph, class_size):
+    
+    # get the two classes of vertices
+    vertices_1 = np.arange(class_size).tolist()
+    vertices_2 = np.arange(class_size, len(graph)).tolist()
+    
+    # technical for permutations generation
+    if len(vertices_1) < len(vertices_2):
+        vertices_1, vertices_2 = vertices_2, vertices_1
+    
+    # NOTE: we include pseudo-matchings (pairs of non-adjacent vertices are accepted)
+    all_matchings = []
+    vercs1_perms = itertools.permutations(vertices_1, len(vertices_2))
+        
+    for permutation in vercs1_perms:
+        all_matchings.append(list(zip(permutation, vertices_2))) 
+        
+    return all_matchings
+
+
+def max_sum_matching(weights, all_matchings):
+    
+    print(all_matchings)
+
+    class_size = len(weights)
+    
+    print(weights)
+    
+    
+    max_matching = all_matchings[0]
+    
+    
+    edge_x, edge_y = max_matching[0]
+    print(edge_x, edge_y)
+    print(edge_x, edge_y - class_size)
+    
+    max_sum = np.nansum([weights[edge_x, edge_y - class_size] for edge_x, edge_y in max_matching])
+    
+    for matching in all_matchings:
+        sum = np.nansum([weights[edge_x, edge_y - class_size] for edge_x, edge_y in matching])
+        
+        print(sum)
+        
+        if sum > max_sum:
+            max_matching = matching
+            max_sum = sum
+    
+    return max_matching
+    
 
 def mwm_greedy(graph, class_size):
     
-    pairing = []
+    matching = []
     
     # get the important (class-connecting) edges
     edges = copy.deepcopy(graph[:class_size, class_size:])
@@ -39,8 +98,8 @@ def mwm_greedy(graph, class_size):
        # get the original edge in graph
         max_edge = (max_edge_ix[0], max_edge_ix[1] + class_size)
                 
-        if are_disjoint(max_edge, pairing):
-            pairing.append(max_edge) 
+        if are_disjoint(max_edge, matching):
+            matching.append(max_edge) 
                         
         # to ensure it does not get picked again
         edges[max_edge_ix] = -edges[max_edge_ix]
@@ -48,7 +107,7 @@ def mwm_greedy(graph, class_size):
         # next max
         max_edge_ix = np.unravel_index(np.nanargmax(edges), edges.shape)
 
-    return pairing
+    return matching
 
 
 def are_disjoint(new_edge, edges):
@@ -93,10 +152,10 @@ def gen_bip_graph(n, complete=False, seed=INSTANCE_SEED):
 
 
 if __name__ == '__main__':
-    instance1, class_size = gen_bip_graph(10)
+    instance1, class_size = gen_bip_graph(5)
     print(instance1)
     
-    print(mwm_greedy(instance1, class_size))
+    # print(mwm_greedy(instance1, class_size))
 
-    
+    print(mwm_brute_force(instance1, class_size))
 
