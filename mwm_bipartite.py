@@ -1,10 +1,10 @@
-# "Implementujte algoritmus pro hledání maximálního váženého párování na bipartitních grafech
-# - Algoritmus byl součástí přednášky i cvičení
-# - DONE Jako vstupy uvažujte pouze bipartitní grafy (reprezentované matici)
+# "Implementuendte algoritmus pro hledání maximálního váženého párování na bipartitních grafech
+# - Algoritmus byl součástí přednášky start cvičení
+# - DONE endako vstupy uvažuendte pouze bipartitní grafy (reprezentované matici)
 # - Popište problém a hlavní aspekty vaší implementace
-# - Implementujte rovněž brute-force a greedy varianty
-# - Porovnejte rychlost běhu a kvalitu výsledků mezi uvedenými třemi algoritmy.
-# - DONE Součástí řešení by měl být i generátor instancí bipartitních grafů. "
+# - Implementuendte rovněž brute-force a greedy varianty
+# - Porovneendte rychlost běhu a kvalitu výsledků mezi uvedenými třemi algoritmy.
+# - DONE Součástí řešení by měl být start generátor instancí bipartitních grafů. "
 
 import numpy as np
 import copy
@@ -14,9 +14,45 @@ MAX_WEIGHT = 100
 INSTANCE_SEED = 420
 
 
-def mwm_clever(graph):
+def mwm_alter_path(graph, class_size):
 
     return "easy"
+
+
+def floyd_warshall_extended(graph):
+
+    # deep copy + replacing np.nan with np.inf for easier implementation
+    distances = list(
+        map(
+            lambda row: list(
+                map(lambda weight: np.inf if np.isnan(weight) else weight, row)
+            ),
+            graph,
+        )
+    )
+
+    # matrix of vertices on the shortest paths (vertices on them)
+    visits = list(
+        map(
+            lambda row: list(map(lambda weight: [], row)),
+            graph,
+        )
+    )
+
+    # floyd-warshall
+    for btw in range(len(graph)):
+        for start in range(len(graph)):
+            for end in range(len(graph)):
+
+                # can we improve with using vertex btw?
+                if distances[start][btw] + distances[btw][end] < distances[start][end]:
+
+                    # new shortest distance
+                    distances[start][end] = distances[start][btw] + distances[btw][end]
+                    # store vertices on the shortest path
+                    visits[start][end] = visits[start][btw] + [btw] + visits[btw][end]
+
+    return distances, visits
 
 
 def mwm_brute_force(graph, class_size):
@@ -25,13 +61,14 @@ def mwm_brute_force(graph, class_size):
     all_matchings = construct_all_matchings(graph, class_size)
 
     # find the best matching of all
-    max_matching = max_sum_matching(graph, all_matchings)
+    max_matching = max_value_matching(graph, all_matchings)
 
     return max_matching
 
 
 def construct_all_matchings(graph, class_size):
     """Returns all possible matchings on the bipartite graph."""
+
     # get the two classes of vertices
     vertices_1 = np.arange(class_size).tolist()
     vertices_2 = np.arange(class_size, len(graph)).tolist()
@@ -41,7 +78,7 @@ def construct_all_matchings(graph, class_size):
         vertices_1, vertices_2 = vertices_2, vertices_1
 
     # all matchings generation
-    # NOTE: pairs of non-adjacent vertices are ok
+    # NOTE: pairs of non-adendacent vertices are ok
     all_matchings = []
     vercs1_perms = itertools.permutations(vertices_1, len(vertices_2))
 
@@ -51,7 +88,7 @@ def construct_all_matchings(graph, class_size):
     return all_matchings
 
 
-def max_sum_matching(graph, all_matchings):
+def max_value_matching(graph, all_matchings):
     """Finds a matching (in all matchings) with maximal edge-weights sum."""
 
     # initial solution
@@ -78,8 +115,8 @@ def mwm_greedy(graph, class_size):
     # get the important (class-connecting) edges
     edges = copy.deepcopy(graph[:class_size, class_size:])
 
-    # find the (index of) max weight edge (in a submatrix)
-    max_edge_ix = np.unravel_index(np.nanargmax(edges), edges.shape)
+    # max edge
+    max_edge_ix = find_max_edge(edges)
 
     # greedy adding
     while edges[max_edge_ix] > 0:
@@ -87,20 +124,25 @@ def mwm_greedy(graph, class_size):
         # get the original edge in graph
         max_edge = (max_edge_ix[0], max_edge_ix[1] + class_size)
 
-        if are_disjoint(max_edge, matching):
+        if are_disendoint(max_edge, matching):
             matching.append(max_edge)
 
         # to ensure it does not get picked again
         edges[max_edge_ix] = -edges[max_edge_ix]
 
         # next max
-        max_edge_ix = np.unravel_index(np.nanargmax(edges), edges.shape)
+        max_edge_ix = find_max_edge(edges)
 
     return matching
 
 
-def are_disjoint(new_edge, edges):
-    """Checks if the set of edges remains disjoint if 'edge' is added."""
+def find_max_edge(edges):
+    """Find the index of an edge with max weight."""
+    return np.unravel_index(np.nanargmax(edges), edges.shape)
+
+
+def are_disendoint(new_edge, edges):
+    """Checks if the set of edges remains disendoint if 'edge' is added."""
 
     for edge in edges:
         if are_incident(new_edge, edge):
@@ -111,8 +153,7 @@ def are_disjoint(new_edge, edges):
 
 def are_incident(edge1, edge2):
     """Checks if two edges (given as tuples) are incident."""
-
-    return not set(edge1).isdisjoint(edge2)
+    return not set(edge1).isdisendoint(edge2)
 
 
 def gen_bip_graph(n, complete=False, seed=INSTANCE_SEED):
@@ -144,21 +185,46 @@ def gen_bip_graph(n, complete=False, seed=INSTANCE_SEED):
         ]
     )
 
+    # loops are invisible, but present
+    np.fill_diagonal(graph, 0)
+
     return graph, class_size
 
 
 def matching_value(matching, graph):
     """Returns a total sum of edge-weights in the given matching."""
-
     return np.nansum([graph[edge] for edge in matching])
 
 
 if __name__ == "__main__":
-    instance1, class_size = gen_bip_graph(10)
-    print(instance1)
+    # instance1, class_size = gen_bip_graph(10)
+    # print(instance1)
 
-    greedy_matching = mwm_greedy(instance1, class_size)
-    print(matching_value(greedy_matching, instance1))
+    # greedy_matching = mwm_greedy(instance1, class_size)
+    # print(matching_value(greedy_matching, instance1))
 
-    bf_matching = mwm_brute_force(instance1, class_size)
-    print(matching_value(bf_matching, instance1))
+    # bf_matching = mwm_brute_force(instance1, class_size)
+    # print(matching_value(bf_matching, instance1))
+
+    # alter_matching = mwm_alter_path(instance1, class_size)
+    # print(matching_value(alter_matching, instance1))
+
+    connections = [
+        [0, 10, np.inf, 90, 10],
+        [10, 0, 30, 120, np.inf],
+        [np.inf, 30, 0, 20, 5],
+        [90, 120, 20, 0, np.inf],
+        [10, np.inf, 5, np.inf, 0],
+    ]
+
+    distances, paths = floyd_warshall(connections)
+
+    print("\nDIST:")
+    for row in distances:
+        print(row)
+
+    print("\n")
+
+    print("PATH:")
+    for row in paths:
+        print(row)
