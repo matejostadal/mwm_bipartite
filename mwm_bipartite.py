@@ -14,7 +14,8 @@ MAX_WEIGHT = 100
 INSTANCE_SEED = 420
 
 
-def mwm_alter_path(graph, class_size):
+def mwm_alter_path(graph):
+    """Performs an alternating path algorithm for the MWM problem."""
 
     # all solutions (for different counts of edges)
     S = []
@@ -23,38 +24,42 @@ def mwm_alter_path(graph, class_size):
     # increasing 'k' value
     while True:
 
+        # adjusts the graph according to current solution
         current_config = setup_red_blue_graph(graph, blue_edges)
-        distances, paths = floyd_warshall_extended(current_config)
+        distances, visits = floyd_warshall_extended(current_config)
 
         # what is the max alternating path?
-        max_path, is_present = find_max_red_path(distances, blue_edges)
+        max_path, is_present = find_max_alter_path(distances, blue_edges)
 
         # no alternating path was found
         if not is_present:
+            # return best solution (across different k's)
             return max(S, key=lambda k_sol: k_sol[0])[1]
 
-        edges_path = edges_on_path(max_path, paths)
+        # get new solution (blue edges) by changing the colors on the alternating path
+        alter_path = edges_on_path(max_path, visits)
+        swap_colours(alter_path, blue_edges)
 
-        swap_colours(edges_path, blue_edges)
-
+        # store S_k into all solutions
         S.append((matching_value(blue_edges, graph), blue_edges))
 
 
-def find_max_red_path(distances, blue_edges):
+def find_max_alter_path(distances, blue_edges):
+    """Find the max path starting and ending in red vertices only."""
 
-    # we only want to keep red vertices as start and end
+    # RED  = ALL - BLUE
     red_vertices = set(range(len(distances)))
-    for edge_start, edge_end in blue_edges:
-        red_vertices.remove(edge_start)
-        red_vertices.remove(edge_end)
+    for blue_edge in blue_edges:
+        red_vertices.difference_update(set(blue_edge))
 
-    # TODO optimalize
-
+    # initial max
     max = distances[0][0]
     max_ix = (0, 0)
 
+    # finding max value in matrix with indices that correspond to red vertices
     for row in range(len(distances)):
         for col in range(len(distances)):
+            # new red max,
             if (
                 row in red_vertices
                 and col in red_vertices
@@ -70,10 +75,10 @@ def find_max_red_path(distances, blue_edges):
 
 
 def swap_colours(edges_path, blue_edges):
+    """Changes colours of all edges on given path."""
 
-    # go trough all edges on the path
     for edge in edges_path:
-        # if it was already blue, drop it from blue
+        # if it was already blue, drop it from blue (hence make it red)
         if edge in blue_edges:
             blue_edges.remove(edge)
 
@@ -82,35 +87,47 @@ def swap_colours(edges_path, blue_edges):
             blue_edges.append(edge[::-1])
 
 
-def edges_on_path(max_path, paths):
+def edges_on_path(max_path, visits):
+    """Returns all edges on the longest path - using the visits matrix."""
+
     mp_start, mp_end = max_path
-    on_path = [mp_start] + paths[mp_start][mp_end] + [mp_end]
+    on_path = [mp_start] + visits[mp_start][mp_end] + [mp_end]
     return list(itertools.pairwise(on_path))
 
 
 def setup_red_blue_graph(graph, blue_edges):
-    # storing the orientations and negative weights (trick used in the algorithm)
+    """Constructs a graph in preparation for the sake of the alternating paths trick."""
 
+    # the result graph
     current_config = copy.deepcopy(graph)
 
     for row in range(len(current_config)):
         for col in range(len(current_config)):
 
-            # BLUE setup
+            # BLUE edges setup
             if (row, col) in blue_edges:
                 # set it as negative
                 current_config[row][col] = -current_config[row][col]
-                # R -> L ... above the diagonal
+                # R -> L ... only above the diagonal
                 current_config[col][row] = np.NaN
-            # RED setup
+            # RED edges setup
             elif row < col:
-                # L -> R ... under the diagonal
+                # L -> R ... only under the diagonal
                 current_config[row][col] = np.NaN
 
     return current_config
 
 
 def floyd_warshall_extended(graph):
+    """Finds the longest paths between each pair of vertices using the F-W algorithm.
+
+    Args:
+        graph: A bipartite weighted graph.
+
+    Returns:
+        distances: matrix of longest paths values between each pair of vertices
+        visits: matrix of vertices on the corresponding longest paths (from distances)
+    """
 
     # deep copy + replacing np.nan with -np.inf for easier implementation
     distances = [
@@ -208,7 +225,7 @@ def find_max_edge(edges):
 
 
 def are_disjoint(new_edge, edges):
-    """Checks if the set of edges remains disjoint if 'edge' is added."""
+    """Checks if the set of edges remains disjoint even if 'new_edge' is added."""
 
     for edge in edges:
         if are_incident(new_edge, edge):
@@ -259,22 +276,23 @@ def gen_bip_graph(n, complete=False, seed=INSTANCE_SEED):
 
 def matching_value(matching, graph):
     """Returns a total sum of edge-weights in the given matching."""
-    # return np.nansum([graph[edge] for edge in matching])
-    return np.nansum([graph[edge_x][edge_y] for edge_x, edge_y in matching])
+    return np.nansum([graph[edge] for edge in matching])
 
 
 if __name__ == "__main__":
     instance1, class_size = gen_bip_graph(10)
     print(instance1)
 
-    # instance1 = [
-    #     [0, np.NaN, np.NaN, 10, 3, 1],
-    #     [np.NaN, 0, np.NaN, 2, 9, 8],
-    #     [np.NaN, np.NaN, 0, 1, 5, 3],
-    #     [10, 2, 1, 0, np.NaN, np.NaN],
-    #     [3, 9, 5, np.NaN, 0, np.NaN],
-    #     [1, 8, 3, np.NaN, np.NaN, 0],
-    # ]
+    # instance1 = np.asarray(
+    #     [
+    #         [0, np.NaN, np.NaN, 10, 3, 1],
+    #         [np.NaN, 0, np.NaN, 2, 9, 8],
+    #         [np.NaN, np.NaN, 0, 1, 5, 3],
+    #         [10, 2, 1, 0, np.NaN, np.NaN],
+    #         [3, 9, 5, np.NaN, 0, np.NaN],
+    #         [1, 8, 3, np.NaN, np.NaN, 0],
+    #     ]
+    # )
     # class_size = 3
 
     greedy_matching = mwm_greedy(instance1)
@@ -285,6 +303,6 @@ if __name__ == "__main__":
     print(bf_matching)
     print(matching_value(bf_matching, instance1))
 
-    alter_matching = mwm_alter_path(np.asarray(instance1), class_size)
+    alter_matching = mwm_alter_path(instance1)
     print(alter_matching)
     print(matching_value(alter_matching, instance1))
