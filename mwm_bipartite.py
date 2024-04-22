@@ -113,22 +113,12 @@ def setup_red_blue_graph(graph, blue_edges):
 def floyd_warshall_extended(graph):
 
     # deep copy + replacing np.nan with -np.inf for easier implementation
-    distances = list(
-        map(
-            lambda row: list(
-                map(lambda weight: -np.inf if np.isnan(weight) else weight, row)
-            ),
-            graph,
-        )
-    )
+    distances = [
+        [-np.inf if np.isnan(weight) else weight for weight in row] for row in graph
+    ]
 
-    # matrix of vertices on the longest paths (vertices on them)
-    visits = list(
-        map(
-            lambda row: list(map(lambda weight: [], row)),
-            graph,
-        )
-    )
+    # matrix of vertices on the corresponding longest paths
+    visits = [[[] for _ in row] for row in graph]
 
     # floyd-warshall
     for btw in range(len(graph)):
@@ -161,7 +151,7 @@ def construct_all_matchings(graph, class_size):
     """Returns all possible matchings on the bipartite graph."""
 
     # get the two classes of vertices
-    vertices_1 = np.arange(class_size).tolist()
+    vertices_1 = np.arange(0, class_size).tolist()
     vertices_2 = np.arange(class_size, len(graph)).tolist()
 
     # technical for permutations generation
@@ -169,7 +159,7 @@ def construct_all_matchings(graph, class_size):
         vertices_1, vertices_2 = vertices_2, vertices_1
 
     # all matchings generation
-    # NOTE: pairs of non-adendacent vertices are ok
+    # NOTE: pairs of non-adjacent vertices are ok
     all_matchings = []
     vercs1_perms = itertools.permutations(vertices_1, len(vertices_2))
 
@@ -180,49 +170,34 @@ def construct_all_matchings(graph, class_size):
 
 
 def max_value_matching(graph, all_matchings):
-    """Finds a matching (in all matchings) with maximal edge-weights sum."""
-
-    # initial solution
-    max_matching = all_matchings[0]
-    max_sum = matching_value(max_matching, graph)
-
-    # check the weight sum for all matchings
-    for matching in all_matchings:
-        sum = matching_value(matching, graph)
-
-        # new max matching?
-        if sum > max_sum:
-            max_matching = matching
-            max_sum = sum
-
-    return max_matching
+    """Finds a matching (from all possible matchings) with maximal edge-weights sum."""
+    return max(all_matchings, key=lambda matching: matching_value(matching, graph))
 
 
-def mwm_greedy(graph, class_size):
+def mwm_greedy(graph):
     """Performs a greedy algorithm for the MWM problem."""
 
     matching = []
 
     # get the important (class-connecting) edges
-    edges = copy.deepcopy(graph[:class_size, class_size:])
+    edges = copy.deepcopy(graph)
 
     # max edge
-    max_edge_ix = find_max_edge(edges)
+    max_edge = find_max_edge(edges)
 
     # greedy adding
-    while edges[max_edge_ix] > 0:
+    while edges[max_edge] > 0:
 
-        # get the original edge in graph
-        max_edge = (max_edge_ix[0], max_edge_ix[1] + class_size)
-
+        # add it if you can
         if are_disjoint(max_edge, matching):
             matching.append(max_edge)
 
-        # to ensure it does not get picked again
-        edges[max_edge_ix] = -edges[max_edge_ix]
+        # ensuring it does not get picked again (not even the other orientation)
+        edges[max_edge] = -edges[max_edge]
+        edges[max_edge[::-1]] = -edges[max_edge[::-1]]
 
         # next max
-        max_edge_ix = find_max_edge(edges)
+        max_edge = find_max_edge(edges)
 
     return matching
 
@@ -244,7 +219,7 @@ def are_disjoint(new_edge, edges):
 
 def are_incident(edge1, edge2):
     """Checks if two edges (given as tuples) are incident."""
-    return not set(edge1).isdisendoint(edge2)
+    return not set(edge1).isdisjoint(edge2)
 
 
 def gen_bip_graph(n, complete=False, seed=INSTANCE_SEED):
@@ -300,47 +275,16 @@ if __name__ == "__main__":
     #     [3, 9, 5, np.NaN, 0, np.NaN],
     #     [1, 8, 3, np.NaN, np.NaN, 0],
     # ]
-
     # class_size = 3
 
-    # config1 = setup_red_blue_graph(instance1, [(0, 3)])
-    # dist, paths = floyd_warshall_extended(config1)
+    greedy_matching = mwm_greedy(instance1)
+    print(greedy_matching)
+    print(matching_value(greedy_matching, instance1))
 
-    # print("DIST")
-    # for row in dist:
-    #     print(row)
-
-    # print("PATHS")
-    # for row in paths:
-    #     print(row)
-
-    # greedy_matching = mwm_greedy(instance1, class_size)
-    # print(matching_value(greedy_matching, instance1))
-
-    # bf_matching = mwm_brute_force(instance1, class_size)
-    # print(matching_value(bf_matching, instance1))
+    bf_matching = mwm_brute_force(instance1, class_size)
+    print(bf_matching)
+    print(matching_value(bf_matching, instance1))
 
     alter_matching = mwm_alter_path(np.asarray(instance1), class_size)
-    print(instance1)
     print(alter_matching)
     print(matching_value(alter_matching, instance1))
-
-    # connections = [
-    #     [0, 10, np.inf, 90, 10],
-    #     [10, 0, 30, 120, np.inf],
-    #     [np.inf, 30, 0, 20, 5],
-    #     [90, 120, 20, 0, np.inf],
-    #     [10, np.inf, 5, np.inf, 0],
-    # ]
-
-    # distances, paths = floyd_warshall_extended(connections)
-
-    # print("\nDIST:")
-    # for row in distances:
-    #     print(row)
-
-    # print("\n")
-
-    # print("PATH:")
-    # for row in paths:
-    #     print(row)
