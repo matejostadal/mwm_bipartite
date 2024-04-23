@@ -1,16 +1,11 @@
-# "Implementuendte algoritmus pro hledání maximálního váženého párování na bipartitních grafech
-# - Algoritmus byl součástí přednášky start cvičení
-# - DONE endako vstupy uvažuendte pouze bipartitní grafy (reprezentované matici)
-# - Popište problém a hlavní aspekty vaší implementace
-# - DONE Implementuendte rovněž brute-force a greedy varianty
-# - Porovneendte rychlost běhu a kvalitu výsledků mezi uvedenými třemi algoritmy.
-# - DONE Součástí řešení by měl být start generátor instancí bipartitních grafů. "
-
 import numpy as np
 import copy
 import itertools
+import time
+import matplotlib.pyplot as plt
 
-MAX_WEIGHT = 100
+
+MAX_WEIGHT = 10
 INSTANCE_SEED = 420
 
 
@@ -279,30 +274,66 @@ def matching_value(matching, graph):
     return np.nansum([graph[edge] for edge in matching])
 
 
+def time_and_quality(min_size, max_size, step, bf=True):
+    """Tests all of the three algorithms on multiple graphs with bounded size."""
+    greedy_out = []
+    bf_out = []
+    alt_out = []
+
+    for size in range(min_size, max_size + step, step):
+
+        graph, class_size = gen_bip_graph(size)
+
+        # use all of the three algorithms designed and measure the time used
+        greedy_start = time.perf_counter()
+        greedy_sol_val = matching_value(mwm_greedy(graph), graph)
+        greedy_end = time.perf_counter() - greedy_start
+
+        greedy_out.append((size, greedy_end, greedy_sol_val))
+
+        alt_start = time.perf_counter()
+        alt_sol_val = matching_value(mwm_alter_path(graph), graph)
+        alt_end = time.perf_counter() - alt_start
+
+        alt_out.append((size, alt_end, alt_sol_val))
+
+        # brute_force is also performed
+        if bf:
+            bf_start = time.perf_counter()
+            bf_sol_val = matching_value(mwm_brute_force(graph, class_size), graph)
+            bf_end = time.perf_counter() - bf_start
+
+            bf_out.append((size, bf_end, bf_sol_val))
+
+    # polished for easier plotting
+    return (list(zip(*greedy_out)), list(zip(*bf_out)), list(zip(*alt_out)))
+
+
 if __name__ == "__main__":
-    instance1, class_size = gen_bip_graph(10)
-    print(instance1)
 
-    # instance1 = np.asarray(
-    #     [
-    #         [0, np.NaN, np.NaN, 10, 3, 1],
-    #         [np.NaN, 0, np.NaN, 2, 9, 8],
-    #         [np.NaN, np.NaN, 0, 1, 5, 3],
-    #         [10, 2, 1, 0, np.NaN, np.NaN],
-    #         [3, 9, 5, np.NaN, 0, np.NaN],
-    #         [1, 8, 3, np.NaN, np.NaN, 0],
-    #     ]
-    # )
-    # class_size = 3
+    # EXAMPLE 1
+    # greedy_out, bf_out, alt_out = time_and_quality(min_size=10, max_size=18, step=2)
 
-    greedy_matching = mwm_greedy(instance1)
-    print(greedy_matching)
-    print(matching_value(greedy_matching, instance1))
+    # EXAMPLE 2
+    greedy_out, _, alt_out = time_and_quality(
+        min_size=10, max_size=70, step=2, bf=False
+    )
 
-    bf_matching = mwm_brute_force(instance1, class_size)
-    print(bf_matching)
-    print(matching_value(bf_matching, instance1))
+    # graphs for easier analysis
+    # NOTE: the graph for brute-force algorithm makes the visualizastion kind of useless
+    # since the runtime is inappropriatelly longer (use the matplotlib window tools for detailed view)
+    fig, ax = plt.subplots(2)
 
-    alter_matching = mwm_alter_path(instance1)
-    print(alter_matching)
-    print(matching_value(alter_matching, instance1))
+    ax[0].plot(greedy_out[0], greedy_out[1])
+    ax[0].plot(alt_out[0], alt_out[1])
+    # ax[0].plot(bf_out[0], bf_out[1])
+    ax[0].set(ylabel="runtime", xlabel="count of vertices")
+    ax[0].legend(["Greedy alg.", "Alter. alg.", "Bf alg."])
+
+    ax[1].plot(greedy_out[0], greedy_out[2])
+    ax[1].plot(alt_out[0], alt_out[2])
+    # ax[1].plot(bf_out[0], bf_out[2])
+    ax[1].set(ylabel="max matching value", xlabel="count of vertices")
+    ax[1].legend(["Greedy alg.", "Alter. alg.", "Bf alg."])
+
+    plt.show()
